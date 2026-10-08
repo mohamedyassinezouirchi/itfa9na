@@ -22,7 +22,7 @@ export default function CreatePage() {
     if (!sessionPending && !session) router.replace('/sign-in')
     document.documentElement.lang = language
     document.documentElement.dir = isFrench ? 'ltr' : 'rtl'
-  }, [isFrench, language, router, session, sessionPending])
+  })
 
   async function handleSubmit() {
     if (!text.trim()) { setError(copy.empty); return }
