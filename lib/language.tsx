@@ -20,7 +20,14 @@ function readLanguage(): Language {
 }
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguageState] = useState<Language>(readLanguage)
+  // Keep the first client render identical to the server render. The saved
+  // language is applied after hydration to avoid changing the markup mid-hydration.
+  const [language, setLanguageState] = useState<Language>('ar')
+
+  useEffect(() => {
+    const savedLanguage = readLanguage()
+    setLanguageState(savedLanguage)
+  }, [])
 
   useEffect(() => {
     document.documentElement.lang = language
