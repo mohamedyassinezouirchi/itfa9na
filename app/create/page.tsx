@@ -4,9 +4,11 @@ import { useEffect, useState } from 'react'
 import { ArrowLeft, ArrowUpLeft, FileCheck2, Loader2, Sparkles } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { AgreementData } from '../agreement-data'
+import { authClient } from '../../lib/auth-client'
 
 export default function CreatePage() {
   const router = useRouter()
+  const { data: session, isPending: sessionPending } = authClient.useSession()
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -17,9 +19,10 @@ export default function CreatePage() {
     : { subtitle: 'مساحة عمل أوضح', example: 'شاهد مثالاً', badge: 'اتفاقات أوضح، بدون سوء فهم', title: 'حوّل كلام الواتساب', accent: 'إلى اتفاق موثّق.', description: 'الصق محادثتك أو أضف نص الاتفاق، وسنرتّبه لك في بطاقة بسيطة يراجعها عميلك ويؤكدها.', placeholder: 'الصق هنا محادثة الواتساب أو نص الاتفاق…', hint: 'لا تحتاج إلى تنسيق النص', submit: 'أنشئ بطاقة الاتفاق', loading: 'جارٍ إنشاء البطاقة', empty: 'الصق محادثة أو ملخص الاتفاق أولاً', failure: 'فشل الطلب', missing: 'لم يتم إنشاء الاتفاق', unexpected: 'حدث خطأ غير متوقع', footer: 'لأن الوضوح يحمي الطرفين' }
 
   useEffect(() => {
+    if (!sessionPending && !session) router.replace('/sign-in')
     document.documentElement.lang = language
     document.documentElement.dir = isFrench ? 'ltr' : 'rtl'
-  }, [isFrench, language])
+  }, [isFrench, language, router, session, sessionPending])
 
   async function handleSubmit() {
     if (!text.trim()) { setError(copy.empty); return }
