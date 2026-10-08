@@ -1,125 +1,32 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-import { createClient } from '@supabase/supabase-js'
+import { headers } from 'next/headers'
 import { z } from 'zod'
+import { auth } from '../../../lib/auth'
+import { db } from '../../../lib/db'
+import { agreements } from '../../../lib/db/schema'
 import type { AgreementData } from '../../../app/agreement-data'
 
-const GenerateRequestSchema = z.object({
-  chatText: z.string().trim().min(10, 'النص قصير جداً').max(20000, 'النص طويل جداً'),
-})
-
-const AgreementDataSchema = z.object({
-  title: z.string().trim().min(1).max(200),
-  client_name: z.string().trim().min(1).max(200),
-  deliverables: z.array(z.string().trim().min(1).max(500)).min(1).max(30),
-  price: z.string().trim().min(1).max(100),
-  deadline: z.string().trim().min(1).max(200),
-  revisions_count: z.string().trim().min(1).max(100),
-  out_of_scope: z.array(z.string().trim().min(1).max(500)).max(30),
-})
-
-const arabicError = (message: string, status: number) => NextResponse.json({ error: message }, { status })
-
-function isConfigurationError(error: unknown) {
-  return error instanceof Error && (error.message.includes('not defined') || error.message.includes('No Supabase key'))
-}
-
-function createServerSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!url) throw new Error('NEXT_PUBLIC_SUPABASE_URL is not defined')
-  const key = serviceKey || anonKey
-  if (!key) throw new Error('No Supabase key available')
-  return createClient(url, key)
-}
-
-const SYSTEM_PROMPT = `أنت خبير في تحليل المحادثات باللغة العربية والدارجة المغربية والعامية واستخراج بيانات الاتفاقيات.
-
-المطلوب: قم بتحليل المحادثة التالية واستخرج البيانات التالية بتنسيق JSON صالح فقط بدون أي نص إضافي:
-
-{
-  "title": "عنوان الاتفاق",
-  "client_name": "اسم العميل",
-  "deliverables": ["المستلم الأول", "المستلم الثاني"],
-  "price": "السعر مع العملة",
-  "deadline": "الموعد النهائي",
-  "revisions_count": "عدد جولات التعديلات",
-  "out_of_scope": ["البند الأول خارج النطاق"]
-}
-
-قواعد مهمة:
-1. أعد فقط JSON صالح بدون أي شرح.
-2. للأرقام والأسعار، استخدم الأرقام العربية (٠١٢٣٤٥٦٧٨٩) عند الإمكان.
-3. افهم السياق حتى لو كانت الكلمات بالدارجة المغربية أو العامية.`
+const RequestSchema = z.object({ chatText: z.string().trim().min(10).max(20000) })
+const DataSchema = z.object({ title: z.string().trim().min(1).max(200), client_name: z.string().trim().min(1).max(200), deliverables: z.array(z.string().trim().min(1).max(500)).min(1).max(30), price: z.string().trim().min(1).max(100), deadline: z.string().trim().min(1).max(200), revisions_count: z.string().trim().min(1).max(100), out_of_scope: z.array(z.string().trim().min(1).max(500)).max(30) })
+const prompt = `حلل النص التالي واستخرج JSON فقط بهذه المفاتيح: title, client_name, deliverables (array), price, deadline, revisions_count, out_of_scope (array). افهم العربية والدارجة والفرنسية.\nالنص:\n`
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
-    const parsed = GenerateRequestSchema.safeParse(body)
-    if (!parsed.success) {
-      return arabicError('أرسل نصاً صالحاً لاستخراج الاتفاق.', 400)
-    }
-    const { chatText } = parsed.data
-
-    const openaiApiKey = process.env.OPENAI_API_KEY
-    if (!openaiApiKey) {
-      return arabicError('خدمة إنشاء الاتفاق غير مهيأة حالياً.', 503)
-    }
-
-    const openai = new OpenAI({ apiKey: openaiApiKey })
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      temperature: 0,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `المحادثة:\n\n${chatText}\n\nأخرج بيانات الاتفاق بصيغة JSON فقط.` },
-      ],
-    })
-
-    const responseContent = completion.choices[0]?.message?.content
-    if (!responseContent) {
-      return arabicError('تعذر استخراج بيانات الاتفاق من النص.', 502)
-    }
-
-    let extractedData: unknown
-    try {
-      extractedData = JSON.parse(responseContent)
-    } catch {
-      return arabicError('تعذر تنسيق بيانات الاتفاق. حاول مرة أخرى.', 502)
-    }
-
-    const validated = AgreementDataSchema.safeParse(extractedData)
-    if (!validated.success) {
-      return arabicError('البيانات المستخرجة من الاتفاق غير مكتملة.', 502)
-    }
-
-    const supabase = createServerSupabase()
-
-    const agreementRecord = { ...validated.data, status: 'pending' }
-
-    const { data: inserted, error: supabaseError } = await supabase
-      .from('agreements')
-      .insert(agreementRecord)
-      .select('id')
-      .single()
-
-    if (supabaseError) {
-      console.error('Supabase insert error:', supabaseError)
-      return arabicError('تعذر حفظ الاتفاق. حاول مرة أخرى.', 503)
-    }
-
-    if (!inserted) {
-      return NextResponse.json({ error: 'No record returned after insert' }, { status: 500 })
-    }
-
-    const result: AgreementData = { ...validated.data, id: inserted.id, status: 'pending' }
-    return NextResponse.json(result)
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) return NextResponse.json({ error: 'يجب تسجيل الدخول أولاً.' }, { status: 401 })
+    const parsed = RequestSchema.safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json({ error: 'أرسل نصاً صالحاً.' }, { status: 400 })
+    if (!process.env.GEMINI_API_KEY) return NextResponse.json({ error: 'خدمة Gemini غير مهيأة.' }, { status: 503 })
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt + parsed.data.chatText }] }], generationConfig: { temperature: 0, responseMimeType: 'application/json' } }) })
+    if (!response.ok) return NextResponse.json({ error: 'تعذر الاتصال بخدمة الإنشاء.' }, { status: 502 })
+    const payload = await response.json()
+    const raw = payload.candidates?.[0]?.content?.parts?.[0]?.text
+    const data = DataSchema.parse(JSON.parse(raw))
+    const id = crypto.randomUUID()
+    await db.insert(agreements).values({ id, userId: session.user.id, title: data.title, clientName: data.client_name, deliverables: JSON.stringify(data.deliverables), price: data.price, deadline: data.deadline, revisionsCount: data.revisions_count, outOfScope: JSON.stringify(data.out_of_scope), status: 'pending', createdAt: new Date() })
+    return NextResponse.json({ ...data, id, status: 'pending' } satisfies AgreementData)
   } catch (error) {
-    console.error('Unexpected error:', error)
-    if (isConfigurationError(error)) return arabicError('خدمة حفظ الاتفاق غير مهيأة حالياً.', 503)
-    return arabicError('حدث خطأ غير متوقع. حاول مرة أخرى.', 500)
+    console.error('[v0] generation error', error)
+    return NextResponse.json({ error: 'حدث خطأ أثناء إنشاء الاتفاق.' }, { status: 500 })
   }
 }
