@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 const ConfirmRequestSchema = z.object({
-  agreementId: z.string().min(1, 'agreementId is required'),
+  agreementId: z.string().uuid('معرف الاتفاق غير صالح'),
 })
 
 function createServerSupabase() {
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const body = await request.json()
     const parsed = ConfirmRequestSchema.safeParse(body)
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Invalid request body', details: parsed.error.flatten() }, { status: 400 })
+      return NextResponse.json({ error: 'أرسل معرف اتفاق صالحاً.' }, { status: 400 })
     }
     const { agreementId } = parsed.data
 
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 
     if (supabaseError) {
       console.error('Supabase update error:', supabaseError)
-      return NextResponse.json({ error: 'Failed to confirm agreement', details: supabaseError.message }, { status: 500 })
+      return NextResponse.json({ error: 'تعذر تأكيد الاتفاق. حاول مرة أخرى.' }, { status: 503 })
     }
 
     if (!updated) {
@@ -53,6 +53,9 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error('Unexpected error:', error)
-    return NextResponse.json({ error: 'Internal server error', details: error instanceof Error ? error.message : String(error) }, { status: 500 })
+    if (error instanceof Error && (error.message.includes('not defined') || error.message.includes('No Supabase key'))) {
+      return NextResponse.json({ error: 'خدمة تأكيد الاتفاق غير مهيأة حالياً.' }, { status: 503 })
+    }
+    return NextResponse.json({ error: 'حدث خطأ غير متوقع. حاول مرة أخرى.' }, { status: 500 })
   }
 }

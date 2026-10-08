@@ -5,18 +5,24 @@ import { z } from 'zod'
 import type { AgreementData } from '../../../app/agreement-data'
 
 const GenerateRequestSchema = z.object({
-  chatText: z.string().min(1, 'chatText is required'),
+  chatText: z.string().trim().min(10, 'النص قصير جداً').max(20000, 'النص طويل جداً'),
 })
 
 const AgreementDataSchema = z.object({
-  title: z.string(),
-  client_name: z.string(),
-  deliverables: z.array(z.string()),
-  price: z.string(),
-  deadline: z.string(),
-  revisions_count: z.string(),
-  out_of_scope: z.array(z.string()),
+  title: z.string().trim().min(1).max(200),
+  client_name: z.string().trim().min(1).max(200),
+  deliverables: z.array(z.string().trim().min(1).max(500)).min(1).max(30),
+  price: z.string().trim().min(1).max(100),
+  deadline: z.string().trim().min(1).max(200),
+  revisions_count: z.string().trim().min(1).max(100),
+  out_of_scope: z.array(z.string().trim().min(1).max(500)).max(30),
 })
+
+const arabicError = (message: string, status: number) => NextResponse.json({ error: message }, { status })
+
+function isConfigurationError(error: unknown) {
+  return error instanceof Error && (error.message.includes('not defined') || error.message.includes('No Supabase key'))
+}
 
 function createServerSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -52,13 +58,13 @@ export async function POST(request: Request) {
     const body = await request.json()
     const parsed = GenerateRequestSchema.safeParse(body)
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Invalid request body', details: parsed.error.flatten() }, { status: 400 })
+      return arabicError('أرسل نصاً صالحاً لاستخراج الاتفاق.', 400)
     }
     const { chatText } = parsed.data
 
     const openaiApiKey = process.env.OPENAI_API_KEY
     if (!openaiApiKey) {
-      return NextResponse.json({ error: 'OPENAI_API_KEY is not configured' }, { status: 500 })
+      return arabicError('خدمة إنشاء الاتفاق غير مهيأة حالياً.', 503)
     }
 
     const openai = new OpenAI({ apiKey: openaiApiKey })
@@ -75,19 +81,19 @@ export async function POST(request: Request) {
 
     const responseContent = completion.choices[0]?.message?.content
     if (!responseContent) {
-      return NextResponse.json({ error: 'No response from OpenAI' }, { status: 502 })
+      return arabicError('تعذر استخراج بيانات الاتفاق من النص.', 502)
     }
 
     let extractedData: unknown
     try {
       extractedData = JSON.parse(responseContent)
     } catch {
-      return NextResponse.json({ error: 'Failed to parse JSON from OpenAI', raw: responseContent }, { status: 502 })
+      return arabicError('تعذر تنسيق بيانات الاتفاق. حاول مرة أخرى.', 502)
     }
 
     const validated = AgreementDataSchema.safeParse(extractedData)
     if (!validated.success) {
-      return NextResponse.json({ error: 'OpenAI response mismatch schema', details: validated.error.flatten(), raw: extractedData }, { status: 502 })
+      return arabicError('البيانات المستخرجة من الاتفاق غير مكتملة.', 502)
     }
 
     const supabase = createServerSupabase()
@@ -102,7 +108,7 @@ export async function POST(request: Request) {
 
     if (supabaseError) {
       console.error('Supabase insert error:', supabaseError)
-      return NextResponse.json({ error: 'Failed to save agreement', details: supabaseError.message }, { status: 500 })
+      return arabicError('تعذر حفظ الاتفاق. حاول مرة أخرى.', 503)
     }
 
     if (!inserted) {
@@ -113,6 +119,7 @@ export async function POST(request: Request) {
     return NextResponse.json(result)
   } catch (error) {
     console.error('Unexpected error:', error)
-    return NextResponse.json({ error: 'Internal server error', details: error instanceof Error ? error.message : String(error) }, { status: 500 })
+    if (isConfigurationError(error)) return arabicError('خدمة حفظ الاتفاق غير مهيأة حالياً.', 503)
+    return arabicError('حدث خطأ غير متوقع. حاول مرة أخرى.', 500)
   }
 }
