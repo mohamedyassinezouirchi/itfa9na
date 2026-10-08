@@ -53,6 +53,9 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error('Unexpected error:', error)
+    if (error instanceof Error && (error.message.includes('not defined') || error.message.includes('No Supabase key'))) {
+      return NextResponse.json({ error: 'خدمة تأكيد الاتفاق غير مهيأة حالياً.' }, { status: 503 })
+    }
     return NextResponse.json({ error: 'حدث خطأ غير متوقع. حاول مرة أخرى.' }, { status: 500 })
   }
 }
