@@ -52,7 +52,7 @@ export default function CreatePage() {
           <div>
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#8ce1d4]/25 bg-[#8ce1d4]/10 px-3 py-1.5 text-xs font-medium text-[#aeece3]"><Sparkles className="size-3.5" /> {copy.badge}</div>
             <p className="mb-4 text-xs font-semibold uppercase tracking-[0.28em] text-[#d4b56d]">01 / {isFrench ? 'STRUCTURER' : 'ترتيب'}</p>
-            <h1 className="max-w-2xl text-5xl font-semibold leading-[1.04] tracking-[-0.04em] sm:text-7xl">{copy.title}<br /><span className="text-[#8ce1d4]">{copy.accent}</span></h1>
+            <h1 className="max-w-2xl text-5xl font-semibold leading-[1.04] tracking-[-0.04em] sm:text-7xl">{copy.title}<br /><span className="text-[#8ce1d4] sm:text-[60px]">{copy.accent}</span></h1>
             <p className="mt-7 max-w-xl text-base leading-8 text-white/60 sm:text-lg">{copy.description}</p>
             <div className="mt-10 flex items-center gap-6 text-xs text-white/45"><span className="flex items-center gap-2"><span className="size-1.5 rounded-full bg-[#8ce1d4]" /> {isFrench ? 'Simple' : 'بسيط'}</span><span className="flex items-center gap-2"><span className="size-1.5 rounded-full bg-[#d4b56d]" /> {isFrench ? 'Lisible' : 'واضح'}</span><span className="flex items-center gap-2"><span className="size-1.5 rounded-full bg-[#e58b83]" /> {isFrench ? 'Confirmé' : 'موثّق'}</span></div>
           </div>
