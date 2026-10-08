@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { Check, CheckCircle2, Clock3, FileCheck2, Pencil, ShieldCheck, Loader2 } from 'lucide-react'
 import { useParams, useRouter } from 'next/navigation'
 import { sampleAgreement, type AgreementData } from '../../agreement-data'
-import { supabase } from '../../../lib/supabase'
 
 export default function AgreementPage() {
   const router = useRouter()
@@ -26,29 +25,22 @@ export default function AgreementPage() {
     setFetchError('')
     ;(async () => {
       try {
-        const { data, error } = await supabase
-          .from('agreements')
-          .select('*')
-          .eq('id', params.id)
-          .maybeSingle()
+        const response = await fetch(`/api/agreement/${encodeURIComponent(params.id)}`)
+        const result = await response.json().catch(() => ({}))
         if (cancelled) return
-        if (error) throw new Error(error.message)
-        if (!data) {
-          setAgreement({ ...sampleAgreement, id: params.id })
-        } else {
-          setAgreement({
-            id: data.id,
-            title: data.title,
-            client_name: data.client_name,
-            deliverables: Array.isArray(data.deliverables) ? data.deliverables : [],
-            price: data.price,
-            deadline: data.deadline,
-            revisions_count: data.revisions_count,
-            out_of_scope: Array.isArray(data.out_of_scope) ? data.out_of_scope : [],
-            status: data.status || 'pending',
-            confirmed_at: data.confirmed_at ? new Intl.DateTimeFormat('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(data.confirmed_at)) : undefined,
-          })
-        }
+        if (!response.ok) throw new Error(result.error || 'حدث خطأ أثناء تحميل الاتفاق')
+        setAgreement({
+          id: result.id,
+          title: result.title,
+          client_name: result.client_name,
+          deliverables: Array.isArray(result.deliverables) ? result.deliverables : [],
+          price: result.price,
+          deadline: result.deadline,
+          revisions_count: result.revisions_count,
+          out_of_scope: Array.isArray(result.out_of_scope) ? result.out_of_scope : [],
+          status: result.status || 'pending',
+          confirmed_at: result.confirmed_at ? new Intl.DateTimeFormat('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(result.confirmed_at)) : undefined,
+        })
       } catch (err) {
         if (cancelled) return
         setFetchError(err instanceof Error ? err.message : 'حدث خطأ أثناء تحميل الاتفاق')
