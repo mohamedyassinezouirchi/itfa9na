@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { Check, CheckCircle2, Clock3, Copy, FileCheck2, Pencil, ShieldCheck, Loader2 } from 'lucide-react'
 import { useParams, useRouter } from 'next/navigation'
 import { sampleAgreement, type AgreementData } from '../../agreement-data'
+import { useLanguage } from '@/lib/language'
+import { LanguageToggle } from '@/components/language-toggle'
 
 export default function AgreementPage() {
   const router = useRouter()
@@ -14,6 +16,7 @@ export default function AgreementPage() {
   const [confirming, setConfirming] = useState(false)
   const [confirmError, setConfirmError] = useState('')
   const [copied, setCopied] = useState(false)
+  const { isFrench } = useLanguage()
 
   async function copyAgreementLink() {
     try {
@@ -96,7 +99,7 @@ export default function AgreementPage() {
   return (
     <main className="min-h-screen bg-[#f7f8f5] px-4 py-6 text-[#18352c] sm:px-8">
       <div className="mx-auto max-w-2xl">
-        <header className="mb-8 flex items-center justify-between"><button onClick={() => router.push('/create')} className="flex items-center gap-2 text-sm font-bold"><span className="flex size-9 items-center justify-center rounded-xl bg-[#174b3b] text-white"><FileCheck2 className="size-5" /></span>اتفقنا</button><span className="flex items-center gap-1.5 text-xs text-[#708179]"><ShieldCheck className="size-4 text-[#4e8b70]" /> اتفاق موثّق</span></header>
+        <header className="mb-8 flex items-center justify-between"><button onClick={() => router.push('/create')} className="flex items-center gap-2 text-sm font-bold"><span className="flex size-9 items-center justify-center rounded-xl bg-[#174b3b] text-white"><FileCheck2 className="size-5" /></span>اتفقنا</button><LanguageToggle /><span className="flex items-center gap-1.5 text-xs text-[#708179]"><ShieldCheck className="size-4 text-[#4e8b70]" /> اتفاق موثّق</span></header>
         {loading && <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[#dce6df] bg-white p-4 text-sm text-[#52665b]"><Loader2 className="size-4 animate-spin" /><span>جارٍ تحميل بيانات الاتفاق...</span></div>}
         {!loading && fetchError && <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">{fetchError}</div>}
         {!loading && fetchError && !agreement && <div className="rounded-[2rem] border border-red-200 bg-white p-8 text-center shadow-sm"><h1 className="text-xl font-bold">تعذر فتح بطاقة الاتفاق</h1><p className="mt-3 text-sm text-[#708179]">{fetchError}</p><button onClick={() => router.push('/create')} className="mt-6 rounded-2xl bg-[#174b3b] px-5 py-3 text-sm font-bold text-white">العودة لإنشاء بطاقة</button></div>}
