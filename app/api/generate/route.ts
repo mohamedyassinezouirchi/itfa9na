@@ -17,11 +17,16 @@ export async function POST(request: Request) {
     const parsed = RequestSchema.safeParse(await request.json())
     if (!parsed.success) return NextResponse.json({ error: 'أرسل نصاً صالحاً.' }, { status: 400 })
     if (!process.env.GEMINI_API_KEY) return NextResponse.json({ error: 'خدمة Gemini غير مهيأة.' }, { status: 503 })
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt + parsed.data.chatText }] }], generationConfig: { temperature: 0, responseMimeType: 'application/json' } }) })
-    if (!response.ok) return NextResponse.json({ error: 'تعذر الاتصال بخدمة الإنشاء.' }, { status: 502 })
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt + parsed.data.chatText }] }], generationConfig: { temperature: 0, responseMimeType: 'application/json' } }) })
+    if (!response.ok) {
+      const providerError = await response.json().catch(() => null)
+      console.error('[v0] Gemini request failed', response.status, providerError?.error?.status)
+      return NextResponse.json({ error: 'تعذر الاتصال بخدمة الإنشاء. تحقق من صلاحية مفتاح Gemini.' }, { status: 502 })
+    }
     const payload = await response.json()
     const raw = payload.candidates?.[0]?.content?.parts?.[0]?.text
-    const data = DataSchema.parse(JSON.parse(raw))
+    if (!raw) return NextResponse.json({ error: 'لم تُرجع Gemini نتيجة صالحة.' }, { status: 502 })
+    const data = DataSchema.parse(JSON.parse(raw.replace(/^```json\s*|\s*```$/g, '').trim()))
     const id = crypto.randomUUID()
     await db.insert(agreements).values({ id, userId: session.user.id, title: data.title, clientName: data.client_name, deliverables: JSON.stringify(data.deliverables), price: data.price, deadline: data.deadline, revisionsCount: data.revisions_count, outOfScope: JSON.stringify(data.out_of_scope), status: 'pending', createdAt: new Date() })
     return NextResponse.json({ ...data, id, status: 'pending' } satisfies AgreementData)
