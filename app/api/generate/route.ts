@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     const parsed = RequestSchema.safeParse(await request.json())
     if (!parsed.success) return NextResponse.json({ error: 'أرسل نصاً صالحاً.' }, { status: 400 })
     if (!process.env.GEMINI_API_KEY) return NextResponse.json({ error: 'خدمة Gemini غير مهيأة.' }, { status: 503 })
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt + parsed.data.chatText }] }], generationConfig: { temperature: 0, responseMimeType: 'application/json' } }) })
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt + parsed.data.chatText }] }], generationConfig: { temperature: 0, responseMimeType: 'application/json' } }) })
     if (!response.ok) return NextResponse.json({ error: 'تعذر الاتصال بخدمة الإنشاء.' }, { status: 502 })
     const payload = await response.json()
     const raw = payload.candidates?.[0]?.content?.parts?.[0]?.text
