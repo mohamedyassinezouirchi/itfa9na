@@ -69,7 +69,7 @@ export default function AgreementPage() {
 
   async function confirmAgreement() {
     if (!params.id || params.id === 'demo') {
-      setAgreement((current) => ({ ...current, status: 'confirmed', confirmed_at: new Intl.DateTimeFormat('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date()) }))
+      setAgreement((current) => current ? { ...current, status: 'confirmed', confirmed_at: new Intl.DateTimeFormat('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date()) } : current)
       return
     }
     setConfirmError('')
@@ -88,7 +88,7 @@ export default function AgreementPage() {
       const formattedDate = result.confirmed_at
         ? new Intl.DateTimeFormat('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(result.confirmed_at))
         : new Intl.DateTimeFormat('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date())
-      setAgreement((current) => ({ ...current, status: 'confirmed', confirmed_at: formattedDate }))
+      setAgreement((current) => current ? { ...current, status: 'confirmed', confirmed_at: formattedDate } : current)
     } catch (err) {
       setConfirmError(err instanceof Error ? err.message : 'حدث خطأ أثناء تأكيد الاتفاق')
     } finally {

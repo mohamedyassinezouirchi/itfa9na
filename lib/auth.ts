@@ -3,7 +3,9 @@ import { Pool } from 'pg'
 
 const origins = [
   'http://localhost:3000',
-  ...['V0_RUNTIME_URL', 'V0_DEV_APP_URL', 'V0_BUILD_URL', 'V0_SANDBOX_URL'].map((key) => process.env[key]).filter(Boolean),
+  ...['V0_RUNTIME_URL', 'V0_DEV_APP_URL', 'V0_BUILD_URL', 'V0_SANDBOX_URL']
+    .map((key) => process.env[key])
+    .filter((origin): origin is string => Boolean(origin)),
 ]
 
 export const auth = betterAuth({
